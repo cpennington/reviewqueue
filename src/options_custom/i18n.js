@@ -15,11 +15,16 @@ this.i18n = {
     "github": {
         "en": "GitHub"
     },
+    "username-title": {
+        "en": "Username:"
+    },
+    "username-prompt": {
+        "en": "username",
+    },
     "api-key-title": {
         "en": "API Key:"
     },
-    "api-key-box": {
-        "en": "6 - 12 characters",
-        "de": "6 - 12 Zeichen"
+    "api-key-prompt": {
+        "en": "api key",
     }
 };
