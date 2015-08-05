@@ -286,7 +286,6 @@ function commits(owner, repo, issue, params) {
 chrome.extension.onMessage.addListener(
     function(request, sender, sendResponse) {
         issues().done(function(issues) {
-            console.log(issues);
             sendResponse(issues);
         });
         return true;
