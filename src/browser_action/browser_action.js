@@ -1,12 +1,16 @@
-function issueListFromStorage() {
+function issuesFromStorage() {
     var deferred = $.Deferred();
-    chrome.storage.local.get("issues", deferred.resolve);
-    return deferred.promise();
-};
-
-function issueFromStorage(number) {
-    var deferred = $.Deferred();
-    chrome.storage.local.get("issue-" + number, deferred.resolve);
+    chrome.storage.local.get("issues", function(items) {
+        chrome.storage.local.get(items["issues"], function(issues) {
+            if (items["issues"]) {
+                deferred.resolve(
+                    $.map(items["issues"], function(issue_key) {
+                        return issues[issue_key];
+                    })
+                );
+            }
+        });
+    });
     return deferred.promise();
 };
 
@@ -26,7 +30,7 @@ var IssueList = React.createClass({
         };
         return React.createElement(
             "div", {id: "queue", className: "list-issues"},
-            this.props.items.map(createIssue)
+            this.props.issues.filter(function(issue, idx) {return !issue.hidden;}).map(createIssue)
         )
     }
 });
@@ -84,6 +88,6 @@ var IssueStatus = React.createClass({
     }
 });
 
-chrome.extension.sendMessage({action: 'getQueue'}, function(response) {
-    React.render(React.createElement(IssueList, {items: response}), document.getElementById("queue"));
+issuesFromStorage().done(function(issues) {
+    React.render(React.createElement(IssueList, {issues: issues}), document.getElementById("queue"));
 });
