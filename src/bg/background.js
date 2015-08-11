@@ -148,13 +148,97 @@ function githubAPI(endpoint, params, allPages) {
     return deferred.promise();
 }
 
+function addLatestIssueComment(issue) {
+    var owner = issue.repository.owner.login;
+    var repo = issue.repository.name;
+    var number = issue.number;
 
-function issues() {
-    // Request issues from github
-    // Return a promise that will resolve with all issues
+    return issueComments(owner, repo, number).done(function(comments) {
+        comments.sort(function(a, b) {
+            if (a.updated_at > b.updated_at) {
+                return -1;
+            }
+            if (a.updated_at < b.updated_at) {
+                return 1;
+            }
+            return 0;
+        });
+        issue.latestIssuesComment = comments[0];
+    });
+}
 
-    var deferred = $.Deferred();
+function addLatestReviewComment(issue) {
+    var owner = issue.repository.owner.login;
+    var repo = issue.repository.name;
+    var number = issue.number;
 
+    if (issue.pull_request) {
+        return reviewComments(owner, repo, number).done(function(comments) {
+            comments.sort(function(a, b) {
+                if (a.updated_at > b.updated_at) {
+                    return -1;
+                }
+                if (a.updated_at < b.updated_at) {
+                    return 1;
+                }
+                return 0;
+            });
+            issue.latestReviewComment = comments[0];
+        });
+    }
+}
+
+function addLatestCommit(issue) {
+    var owner = issue.repository.owner.login;
+    var repo = issue.repository.name;
+    var number = issue.number;
+
+    if (issue.pull_request) {
+        return commits(owner, repo, number).done(function(commits) {
+            commits.sort(function(a, b) {
+                if (a.commit.committer.date > b.commit.committer.date) {
+                    return -1;
+                }
+                if (a.commit.committer.date < b.commit.committer.date) {
+                    return 1;
+                }
+                return 0;
+            });
+            issue.latestCommit = commits[0];
+        });
+    }
+}
+
+function markHidden(issue) {
+    var latestChange = null;
+    var latestUser = null;
+
+    function laterDate(date, user) {
+        if (!latestChange || (date && date >= latestChange)) {
+            latestChange = date;
+            latestUser = user;
+        }
+    }
+    if (issue.latestIssueComment) {
+        laterDate(issue.latestIssueComment.updated_at, issue.latestIssueComment.user.login);
+    }
+    if (issue.latestReviewComment) {
+        laterDate(issue.latestReviewComment.updated_at, issue.latestReviewComment.user.login);
+    }
+    if (issue.latestCommit) {
+        var user = null;
+        // We might not be able to find a github user for the commit
+        if (issue.latestCommit.committer) {
+            user = issue.latestCommit.committer.login;
+        }
+        laterDate(issue.latestCommit.commit.committer.date, user);
+    }
+
+    issue.hidden = latestUser == settings.get('username');
+}
+
+
+function updateIssuesList() {
     githubAPI(
         'issues',
         {
@@ -165,89 +249,26 @@ function issues() {
         },
         true
     ).done(function(issues) {
-        var extraData = [];
-
-        $.each(issues, function(idx, issue) {
-            owner = issue.repository.owner.login
-            repo = issue.repository.name
-            number = issue.number
-
-            extraData.push(
-                issueComments(owner, repo, number).done(function(comments) {
-                    comments.sort(function(a, b) {
-                        if (a.updated_at > b.updated_at) {
-                            return -1;
-                        }
-                        if (a.updated_at < b.updated_at) {
-                            return 1;
-                        }
-                        return 0;
-                    });
-                    issue.latestIssuesComment = comments[0];
-                })
-            )
-            if (issue.pull_request) {
-                extraData.push(
-                    reviewComments(owner, repo, number).done(function(comments) {
-                        comments.sort(function(a, b) {
-                            if (a.updated_at > b.updated_at) {
-                                return -1;
-                            }
-                            if (a.updated_at < b.updated_at) {
-                                return 1;
-                            }
-                            return 0;
-                        });
-                        issue.latestReviewComment = comments[0];
-                    })
-                )
-                extraData.push(
-                    commits(owner, repo, number).done(function(commits) {
-                        commits.sort(function(a, b) {
-                            if (a.commit.committer.date > b.commit.committer.date) {
-                                return -1;
-                            }
-                            if (a.commit.committer.date < b.commit.committer.date) {
-                                return 1;
-                            }
-                            return 0;
-                        });
-                        issue.latestCommit = commits[0];
-                    })
-                )
-            }
+        var issueIds = $.map(issues, function(issue) {
+            return issue.html_url;
         });
-        $.when.apply($, extraData).done(function() {
-            deferred.resolve($.grep(issues, function(issue) {
-                var latestChange = null;
-                var latestUser = null;
+        chrome.storage.local.set({issues: issueIds});
+        chrome.storage.local.get(issueIds, function(storedIssues) {
+            $.each(issues, function(idx, issue) {
+                $.when(
+                    addLatestIssueComment(issue),
+                    addLatestReviewComment(issue),
+                    addLatestCommit(issue)
+                ).done(function() {
+                    markHidden(issue);
 
-                function laterDate(date, user) {
-                    if (!latestChange || (date && date >= latestChange)) {
-                        latestChange = date;
-                        latestUser = user;
-                    }
-                }
-                if (issue.latestIssueComment) {
-                    laterDate(issue.latestIssueComment.updated_at, issue.latestIssueComment.user.login);
-                }
-                if (issue.latestReviewComment) {
-                    laterDate(issue.latestReviewComment.updated_at, issue.latestReviewComment.user.login);
-                }
-                if (issue.latestCommit) {
-                    var user = null;
-                    // We might not be able to find a github user for the commit
-                    if (issue.latestCommit.committer) {
-                        user = issue.latestCommit.committer.login;
-                    }
-                    laterDate(issue.latestCommit.commit.committer.date, user);
-                }
-                return latestUser != settings.get('username');
-            }));
+                    var data = {};
+                    data[issue.html_url] = issue;
+                    chrome.storage.local.set(data);
+                });
+            });
         });
     });
-
-    return deferred.promise();
 }
 
 function issueComments(owner, repo, issue, params) {
@@ -282,13 +303,5 @@ function commits(owner, repo, issue, params) {
     );
 }
 
-//example of using a message handler from the inject scripts
-chrome.extension.onMessage.addListener(
-    function(request, sender, sendResponse) {
-        issues().done(function(issues) {
-            console.log(issues);
-            sendResponse(issues);
-        });
-        return true;
-    }
-);
+updateIssuesList();
+setInterval(updateIssuesList, 5 * 60 * 1000);
