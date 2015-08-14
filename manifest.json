@@ -25,6 +25,7 @@
         "https://api.github.com/repos/*/*/issues/*/comments",
         "https://api.github.com/repos/*/*/pulls/*/comments",
         "https://api.github.com/repos/*/*/pulls/*/commits",
+        "https://api.github.com/repos/*/*/commits/*/status",
         "tabs",
         "storage"
     ],
