@@ -132,7 +132,6 @@ var IssueStatus = React.createClass({
 });
 
 reactRootElement = null;
-setOfIssuesHasChanged = false
 
 issuesFromStorage().done(function(issues) {
     reactRootElement = React.createElement(IssueList, {issues: issues});
@@ -141,18 +140,7 @@ issuesFromStorage().done(function(issues) {
 
 chrome.storage.onChanged.addListener(function(changes, namespace) {
     if (namespace == "local" && "issues" in changes) {
-        setOfIssuesHasChanged = true;
+        reactRootElement = React.createElement(IssueList, {issues: issues});
+        React.render(reactRootElement, document.getElementById("queue"));
     }
 });
-
-function gatherUpdatesFromStorage() {
-    if (!reactRootElement || !setOfIssuesHasChanged) {
-        return;
-    }
-    issuesFromStorage().done(function(issues) {
-        reactRootElement.props.issues = issues;
-        setOfIssuesHasChanged = false;
-    });
-}
-
-setInterval(gatherUpdatesFromStorage, 30 * 1000);
