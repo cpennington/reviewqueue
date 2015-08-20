@@ -3,11 +3,19 @@ function issuesFromStorage() {
     chrome.storage.local.get("issues", function(items) {
         chrome.storage.local.get(items["issues"], function(issues) {
             if (items["issues"]) {
-                deferred.resolve(
-                    $.map(items["issues"], function(issue_key) {
-                        return issues[issue_key];
-                    })
-                );
+                var allIssues = $.map(items["issues"], function(issue_key) {
+                    return issues[issue_key];
+                });
+                allIssues.sort(function(a, b) {
+                    if (a.latestChangeDate > b.latestChangeDate) {
+                        return -1;
+                    }
+                    if (a.latestChangeDate < b.latestChangeDate) {
+                        return 1;
+                    }
+                    return 0;
+                });
+                deferred.resolve(allIssues);
             }
         });
     });
@@ -25,7 +33,8 @@ var IssueList = React.createClass({
                 number: issue.number,
                 title: issue.title,
                 status: issue.state,
-                html_url: issue.html_url
+                html_url: issue.html_url,
+                commitStatuses: issue.latestCommitStatuses
             });
         };
         return React.createElement(
@@ -49,7 +58,8 @@ var Issue = React.createClass({
                     title: this.props.title
                 }),
                 React.createElement(IssueStatus, {
-                    status: this.props.status
+                    status: this.props.status,
+                    commitStatuses: this.props.commitStatuses
                 })
             )
         );
@@ -75,19 +85,62 @@ var IssueDetails = React.createClass({
 var IssueStatus = React.createClass({
     displayName: "IssueStatus",
     render: function() {
+        var displayStatus = this.getDisplayStatus();
         return React.createElement(
-            // NOTE (@talbs): Cale, styling is expecting class names for states (state-open = open, state-closed = closed, state-merged = merged, tests-passed = pass, tests-failed = failed, tests-running = running). Also, Text values for PR/Issue state and tests state, while  should change as well (Tests Passed, Tests Failed, Tests Running. Need help with wiring, plz.
-            "div", {className: "issue-status state-open tests-running"},
-            // NOTE (@talbs): Cale, I needed a DOM element to show the visual icon status. Also, I need animate.css-based HTML classes (animated infinite pulse) attached to this when tests are running.
-            React.createElement("span", {className: "issue-status-icon"}),
-            React.createElement(
-                "span", {className: "issue-status-value"},
-                React.createElement("span", {className: "issue-state"}, this.props.status)
-            )
+            "div", {className: this.cssClasses(displayStatus)},
+            React.createElement("span", {className: this.iconCssClasses(displayStatus)})
         )
+    },
+    getDisplayStatus: function() {
+        var displayStatus = "success";
+        for (var i = 0; i < this.props.commitStatuses.length; i++) {
+            var state = this.props.commitStatuses[i].state;
+            switch(state) {
+                case "failure":
+                    displayStatus = state;
+                    break;
+                case "pending":
+                    if (displayStatus != "failure") {
+                        displayStatus = state;
+                    }
+                    break;
+                default:
+                    break;
+            }
+        }
+        return displayStatus;
+    },
+    cssClasses: function(displayStatus) {
+        var classes = ["issue-status", "state-" + this.props.status];
+        testResultClasses = {
+            success: "tests-passed",
+            failure: "tests-failed",
+            pending: "tests-running"
+        };
+        classes.push(testResultClasses[displayStatus]);
+        return classes.join(" ");
+    },
+    iconCssClasses: function(displayStatus) {
+        var classes = ["issue-status-icon"];
+        if (displayStatus == "pending") {
+            classes.push("animated");
+            classes.push("infinite");
+            classes.push("flash");
+        }
+        return classes.join(" ")
     }
 });
 
+reactRootElement = null;
+
 issuesFromStorage().done(function(issues) {
-    React.render(React.createElement(IssueList, {issues: issues}), document.getElementById("queue"));
+    reactRootElement = React.createElement(IssueList, {issues: issues});
+    React.render(reactRootElement, document.getElementById("queue"));
+});
+
+chrome.storage.onChanged.addListener(function(changes, namespace) {
+    if (namespace == "local" && "issues" in changes) {
+        reactRootElement = React.createElement(IssueList, {issues: issues});
+        React.render(reactRootElement, document.getElementById("queue"));
+    }
 });

@@ -109,8 +109,6 @@ function githubAPI(endpoint, params, allPages) {
     // Store updated results in local storage
     // Return a promise that will resolve with all values
 
-    var deferred = $.Deferred();
-
     params = $.extend({per_page: 100}, params);
 
     var query = $.param(params);
@@ -123,29 +121,6 @@ function githubAPI(endpoint, params, allPages) {
         results = _githubAPICall(url);
     }
     return results;
-
-    results.done(function(updatedItems, textStatus, jqXHR) {
-        var key = storageKey(endpoint, params);
-
-        chrome.storage.local.get(key, function(storedItems) {
-            storedItems = storedItems || {};
-            storedItems[key] = storedItems[key] || {};
-
-            for (var idx in updatedItems) {
-                storedItems[key][updatedItems[idx].id] = updatedItems[idx];
-            }
-
-            // Update items in local storage
-            chrome.storage.local.set(storedItems);
-            deferred.resolve({
-                allItems: storedItems[key],
-                updatedIds: $.map(updatedItems, function(item) {return item.id;}),
-            });
-        });
-        // TODO: Get more pages
-    });
-
-    return deferred.promise();
 }
 
 function addLatestIssueComment(issue) {
@@ -163,7 +138,7 @@ function addLatestIssueComment(issue) {
             }
             return 0;
         });
-        issue.latestIssuesComment = comments[0];
+        issue.latestIssueComment = comments[0];
     });
 }
 
@@ -209,6 +184,20 @@ function addLatestCommit(issue) {
     }
 }
 
+function addLatestCommitStatus(issue) {
+    var owner = issue.repository.owner.login;
+    var repo = issue.repository.name;
+    if (!issue.latestCommit) {
+        issue.latestCommitStatuses = [];
+        return;
+    }
+    var commitSha = issue.latestCommit.sha;
+
+    return statuses(owner, repo, commitSha).done(function(statusResponse) {
+        issue.latestCommitStatuses = statusResponse.statuses;
+    });
+}
+
 function markHidden(issue) {
     var latestChange = null;
     var latestUser = null;
@@ -234,6 +223,7 @@ function markHidden(issue) {
         laterDate(issue.latestCommit.commit.committer.date, user);
     }
 
+    issue.latestChangeDate = latestChange
     issue.hidden = latestUser == settings.get('username');
 }
 
@@ -256,9 +246,9 @@ function updateIssuesList() {
         chrome.storage.local.get(issueIds, function(storedIssues) {
             $.each(issues, function(idx, issue) {
                 $.when(
+                    addLatestCommit(issue).then(addLatestCommitStatus(issue)),
                     addLatestIssueComment(issue),
-                    addLatestReviewComment(issue),
-                    addLatestCommit(issue)
+                    addLatestReviewComment(issue)
                 ).done(function() {
                     markHidden(issue);
 
@@ -300,6 +290,16 @@ function commits(owner, repo, issue, params) {
         'repos/' + owner + '/' + repo + '/pulls/' + issue + '/commits',
         params,
         true
+    );
+}
+
+function statuses(owner, repo, commitSha, params) {
+    // Request updated commits from github
+    // Return a deferred that will resolved with all statuses for this commit
+    return githubAPI(
+        'repos/' + owner + '/' + repo + '/commits/' + commitSha + '/status',
+        params,
+        false
     );
 }
 
