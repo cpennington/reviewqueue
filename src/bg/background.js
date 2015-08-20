@@ -246,19 +246,15 @@ function updateIssuesList() {
         chrome.storage.local.get(issueIds, function(storedIssues) {
             $.each(issues, function(idx, issue) {
                 $.when(
-                    addLatestCommit(issue)
+                    addLatestCommit(issue).then(addLatestCommitStatus(issue)),
+                    addLatestIssueComment(issue),
+                    addLatestReviewComment(issue)
                 ).done(function() {
-                    $.when(
-                        addLatestCommitStatus(issue),
-                        addLatestIssueComment(issue),
-                        addLatestReviewComment(issue)
-                    ).done(function() {
-                        markHidden(issue);
+                    markHidden(issue);
 
-                        var data = {};
-                        data[issue.html_url] = issue;
-                        chrome.storage.local.set(data);
-                    });
+                    var data = {};
+                    data[issue.html_url] = issue;
+                    chrome.storage.local.set(data);
                 });
             });
         });
