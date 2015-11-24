@@ -44,8 +44,11 @@ var IssueList = React.createClass({
         };
         return React.createElement(
             "div", {id: "queue", className: "list-issues"},
-            this.props.issues.filter(function(issue, idx) {return !issue.hidden;}).map(createIssue)
-        )
+            this.props
+                .issues
+                .filter(function(issue, idx) {return !issue.hidden;})
+                .map(createIssue)
+        );
     }
 });
 
