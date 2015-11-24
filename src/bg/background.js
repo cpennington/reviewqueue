@@ -160,6 +160,8 @@ function addLatestReviewComment(issue) {
             });
             issue.latestReviewComment = comments[0];
         });
+    } else {
+        return $.Deferred().resolve().promise();
     }
 }
 
@@ -181,6 +183,8 @@ function addLatestCommit(issue) {
             });
             issue.latestCommit = commits[0];
         });
+    } else {
+        return $.Deferred().resolve().promise();
     }
 }
 
