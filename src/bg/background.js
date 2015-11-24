@@ -203,8 +203,8 @@ function addLatestCommitStatus(issue) {
 }
 
 function markHidden(issue) {
-    var latestChange = null;
-    var latestUser = null;
+    var latestChange = issue.created_at;
+    var latestUser = issue.user.login;
 
     function laterDate(date, user) {
         if (!latestChange || (date && date >= latestChange)) {
