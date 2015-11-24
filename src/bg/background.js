@@ -229,6 +229,7 @@ function markHidden(issue) {
 
 
 function updateIssuesList() {
+    console.log("Updating issues");
     githubAPI(
         'issues',
         {
@@ -239,17 +240,21 @@ function updateIssuesList() {
         },
         true
     ).done(function(issues) {
+        console.log("Recieved issues from GitHub");
+        console.log(issues)
         var issueIds = $.map(issues, function(issue) {
             return issue.html_url;
         });
         chrome.storage.local.set({issues: issueIds});
         chrome.storage.local.get(issueIds, function(storedIssues) {
             $.each(issues, function(idx, issue) {
+                console.log("Starting processing of issue" + issue.url);
                 $.when(
                     addLatestCommit(issue).then(addLatestCommitStatus(issue)),
                     addLatestIssueComment(issue),
                     addLatestReviewComment(issue)
                 ).done(function() {
+                    console.log("Finished processing of issue" + issue.url);
                     markHidden(issue);
 
                     var data = {};

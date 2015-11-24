@@ -7,12 +7,17 @@ function issuesFromStorage() {
                     return issues[issue_key];
                 });
                 allIssues.sort(function(a, b) {
+                    console.log(a);
+                    console.log(b);
                     if (a.latestChangeDate > b.latestChangeDate) {
                         return -1;
+                        console.log("Picked left");
                     }
                     if (a.latestChangeDate < b.latestChangeDate) {
                         return 1;
+                        console.log("Picked right");
                     }
+                    console.log("No decision");
                     return 0;
                 });
                 deferred.resolve(allIssues);
